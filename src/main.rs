@@ -2,6 +2,8 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
+use warp::body::BodyDeserializeError;
+use warp::cors::CorsForbidden;
 use warp::hyper::{Method, StatusCode};
 use warp::{reject::Reject, Filter, Rejection, Reply};
 
@@ -97,10 +99,9 @@ async fn get_questions(
 }
 
 async fn add_question(
-    store: Store,
     question: Question,
+    store: Store,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    println!("Hello, world!");
     store
         .questions
         .write()
@@ -114,6 +115,16 @@ async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
         Ok(warp::reply::with_status(
             error.to_string(),
             StatusCode::RANGE_NOT_SATISFIABLE,
+        ))
+    } else if let Some(error) = r.find::<CorsForbidden>() {
+        Ok(warp::reply::with_status(
+            error.to_string(),
+            StatusCode::FORBIDDEN,
+        ))
+    } else if let Some(error) = r.find::<BodyDeserializeError>() {
+        Ok(warp::reply::with_status(
+            error.to_string(),
+            StatusCode::UNPROCESSABLE_ENTITY,
         ))
     } else {
         Ok(warp::reply::with_status(
@@ -140,16 +151,16 @@ async fn main() {
     let get_questions = warp::get()
         .and(warp::path("questions"))
         .and(warp::path::end())
-        .and(warp::query())
-        .and(store_filter.clone())
+        .and(warp::query()) // ハンドラの第1引数にクエリパラメータ
+        .and(store_filter.clone()) // 第2引数にStore
         .and_then(get_questions);
 
     // POST /questions
     let add_question = warp::post()
         .and(warp::path("questions"))
         .and(warp::path::end())
-        .and(store_filter.clone())
-        .and(warp::body::json())
+        .and(warp::body::json()) // 第1引数にハンドラの引数にリクエストボディ
+        .and(store_filter.clone()) // 第2引数にStore
         .and_then(add_question);
 
     let routes = get_questions
