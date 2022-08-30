@@ -1,3 +1,5 @@
+#![warn(clippy::all)]
+
 use handle_errors::return_error;
 use warp::hyper::Method;
 use warp::Filter;
