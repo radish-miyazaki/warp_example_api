@@ -10,6 +10,12 @@ mod types;
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
+
+    log::error!("This is an error!");
+    log::info!("This is an info!");
+    log::warn!("This is an warn!");
+
     // INFO: Store構造体をDBモックとする
     let store = store::Store::new();
     let store_filter = warp::any().map(move || store.clone());
