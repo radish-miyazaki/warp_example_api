@@ -15,7 +15,7 @@ pub async fn add_answer(
 ) -> Result<impl warp::Reply, warp::Rejection> {
     let answer = Answer {
         // TODO: ランダムな数値を生成する
-        id: AnswerId("1".to_string()),
+        id: AnswerId(1),
         // TODO: エラーチェックの追加
         content: params.get("content").unwrap().to_string(),
         question_id: QuestionId(params.get("questionId").unwrap().parse::<i32>().unwrap()),
