@@ -18,7 +18,7 @@ pub async fn add_answer(
         id: AnswerId("1".to_string()),
         // TODO: エラーチェックの追加
         content: params.get("content").unwrap().to_string(),
-        question_id: QuestionId(params.get("questionId").unwrap().to_string()),
+        question_id: QuestionId(params.get("questionId").unwrap().parse::<i32>().unwrap()),
     };
 
     // TODO: 質問が存在するかチェック

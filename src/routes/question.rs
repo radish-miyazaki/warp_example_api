@@ -29,7 +29,7 @@ pub async fn get_questions(
 }
 
 #[instrument]
-pub async fn get_question(id: String, store: Store) -> Result<impl warp::Reply, warp::Rejection> {
+pub async fn get_question(id: i32, store: Store) -> Result<impl warp::Reply, warp::Rejection> {
     match store.questions.write().get(&QuestionId(id)) {
         Some(q) => Ok(warp::reply::json(&q)),
         None => Err(warp::reject::custom(Error::QuestionNotFound)),
@@ -51,7 +51,7 @@ pub async fn add_question(
 
 #[instrument]
 pub async fn update_question(
-    id: String,
+    id: i32,
     question: Question,
     store: Store,
 ) -> Result<impl warp::Reply, warp::Rejection> {
@@ -64,10 +64,7 @@ pub async fn update_question(
 }
 
 #[instrument]
-pub async fn delete_question(
-    id: String,
-    store: Store,
-) -> Result<impl warp::Reply, warp::Rejection> {
+pub async fn delete_question(id: i32, store: Store) -> Result<impl warp::Reply, warp::Rejection> {
     match store.questions.write().remove(&QuestionId(id)) {
         Some(_) => Ok(warp::reply::with_status("Question deleted", StatusCode::OK)),
         None => Err(warp::reject::custom(Error::QuestionNotFound)),
