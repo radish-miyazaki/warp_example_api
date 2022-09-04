@@ -14,6 +14,10 @@ async fn main() {
     let store = store::Store::new();
     let store_filter = warp::any().map(move || store.clone());
 
+    // DBへのマイグレーション実行
+    // let store = store::Store::new("postgres://localhost:5432/rustwebdev").await;
+    // sqlx::migrate!().run(&store.clone().connection).await.expect("Cannnot run migration");
+
     // CORS
     let cors = warp::cors()
         .allow_any_origin()
