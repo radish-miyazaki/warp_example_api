@@ -1,50 +1,54 @@
 use handle_errors::Error;
 use std::collections::HashMap;
-use tracing::{info, instrument};
+use tracing::{event, instrument, Level};
 use warp::http::StatusCode;
 
 use crate::store::Store;
-use crate::types::pagination::extract_pagination;
-use crate::types::question::{Question, QuestionId};
+use crate::types::pagination::{extract_pagination, Pagination};
+use crate::types::question::{NewQuestion, Question, QuestionId};
 
 #[instrument]
 pub async fn get_questions(
     params: HashMap<String, String>,
     store: Store,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    info!("querying questions");
+    event!(target: "question_and_answer", Level::INFO, "querying questions");
+    let mut pagination = Pagination::default();
 
     if !params.is_empty() {
-        let pagination = extract_pagination(params)?;
-        info!(pagination = true);
-        let res: Vec<Question> = store.questions.read().values().cloned().collect();
-        let res = &res.get(pagination.start..pagination.end);
-
-        Ok(warp::reply::json(&res.unwrap_or(&[])))
-    } else {
-        info!(pagination = false);
-        let res: Vec<Question> = store.questions.read().values().cloned().collect();
-        Ok(warp::reply::json(&res))
+        event!(Level::INFO, pagination = true);
+        pagination = extract_pagination(params)?;
     }
+
+    let res: Vec<Question> = match store
+        .get_questions(pagination.limit, pagination.offset)
+        .await
+    {
+        Ok(res) => res,
+        Err(e) => return Err(warp::reject::custom(Error::DatabaseQueryError)),
+    };
+
+    Ok(warp::reply::json(&res))
 }
 
 #[instrument]
 pub async fn get_question(id: i32, store: Store) -> Result<impl warp::Reply, warp::Rejection> {
-    match store.questions.write().get(&QuestionId(id)) {
-        Some(q) => Ok(warp::reply::json(&q)),
-        None => Err(warp::reject::custom(Error::QuestionNotFound)),
-    }
+    let res: Question = match store.get_question(id).await {
+        Ok(res) => res,
+        Err(e) => return Err(warp::reject::custom(Error::DatabaseQueryError)),
+    };
+
+    Ok(warp::reply::json(&res))
 }
 
 #[instrument]
 pub async fn add_question(
-    question: Question,
+    new_question: NewQuestion,
     store: Store,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    store
-        .questions
-        .write()
-        .insert(question.id.clone(), question);
+    if let Err(e) = store.add_question(new_question).await {
+        return Err(warp::reject::custom(Error::DatabaseQueryError));
+    }
 
     Ok(warp::reply::with_status("Question added", StatusCode::OK))
 }
