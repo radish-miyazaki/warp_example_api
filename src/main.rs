@@ -10,15 +10,16 @@ mod types;
 
 #[tokio::main]
 async fn main() {
-    // DBと接続
+    // Database
     let store = store::Store::new("postgres://localhost:5432/rustwebdev").await;
-    let store_filter = warp::any().map(move || store.clone());
 
-    // DBへのマイグレーション実行
+    // Migration
     sqlx::migrate!()
         .run(&store.clone().conn)
         .await
         .expect("Cannnot run migration");
+
+    let store_filter = warp::any().map(move || store.clone());
 
     // CORS
     let cors = warp::cors()
