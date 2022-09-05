@@ -1,29 +1,17 @@
-use std::collections::HashMap;
+use handle_errors::Error;
 use tracing::instrument;
 use warp::http::StatusCode;
 
 use crate::store::Store;
-use crate::types::{
-    answer::{Answer, AnswerId},
-    question::QuestionId,
-};
+use crate::types::answer::NewAnswer;
 
 #[instrument]
 pub async fn add_answer(
     store: Store,
-    params: HashMap<String, String>,
+    new_answer: NewAnswer,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    let answer = Answer {
-        // TODO: ランダムな数値を生成する
-        id: AnswerId(1),
-        // TODO: エラーチェックの追加
-        content: params.get("content").unwrap().to_string(),
-        question_id: QuestionId(params.get("questionId").unwrap().parse::<i32>().unwrap()),
-    };
-
-    // TODO: 質問が存在するかチェック
-
-    store.answers.write().insert(answer.id.clone(), answer);
-
-    Ok(warp::reply::with_status("Answer added", StatusCode::OK))
+    match store.add_answer(new_answer).await {
+        Ok(_) => Ok(warp::reply::with_status("Answer added", StatusCode::OK)),
+        Err(e) => Err(warp::reject::custom(Error::DatabaseQueryError(e))),
+    }
 }
