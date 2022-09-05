@@ -19,6 +19,7 @@ async fn main() {
         .await
         .expect("Cannnot run migration");
 
+    // INFO: storeをmapのコールバック内に所有権を移動しているので、各storeの操作が終わった後にfilter化
     let store_filter = warp::any().map(move || store.clone());
 
     // CORS
