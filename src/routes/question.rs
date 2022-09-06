@@ -1,4 +1,3 @@
-use handle_errors::Error;
 use std::collections::HashMap;
 use tracing::{event, instrument, Level};
 use warp::http::StatusCode;
@@ -25,7 +24,7 @@ pub async fn get_questions(
         .await
     {
         Ok(res) => res,
-        Err(e) => return Err(warp::reject::custom(Error::DatabaseQueryError(e))),
+        Err(e) => return Err(warp::reject::custom(e)),
     };
 
     Ok(warp::reply::json(&res))
@@ -35,7 +34,7 @@ pub async fn get_questions(
 pub async fn get_question(id: i32, store: Store) -> Result<impl warp::Reply, warp::Rejection> {
     let res: Question = match store.get_question(id).await {
         Ok(res) => res,
-        Err(e) => return Err(warp::reject::custom(Error::DatabaseQueryError(e))),
+        Err(e) => return Err(warp::reject::custom(e)),
     };
 
     Ok(warp::reply::json(&res))
@@ -48,7 +47,7 @@ pub async fn add_question(
 ) -> Result<impl warp::Reply, warp::Rejection> {
     let res: Question = match store.add_question(new_question).await {
         Ok(res) => res,
-        Err(e) => return Err(warp::reject::custom(Error::DatabaseQueryError(e))),
+        Err(e) => return Err(warp::reject::custom(e)),
     };
 
     Ok(warp::reply::json(&res))
@@ -62,7 +61,7 @@ pub async fn update_question(
 ) -> Result<impl warp::Reply, warp::Rejection> {
     let res = match store.update_question(question, id).await {
         Ok(res) => res,
-        Err(e) => return Err(warp::reject::custom(Error::DatabaseQueryError(e))),
+        Err(e) => return Err(warp::reject::custom(e)),
     };
 
     Ok(warp::reply::json(&res))
@@ -71,7 +70,7 @@ pub async fn update_question(
 #[instrument]
 pub async fn delete_question(id: i32, store: Store) -> Result<impl warp::Reply, warp::Rejection> {
     if let Err(e) = store.delete_question(id).await {
-        return Err(warp::reject::custom(Error::DatabaseQueryError(e)));
+        return Err(warp::reject::custom(e));
     }
 
     Ok(warp::reply::with_status(
