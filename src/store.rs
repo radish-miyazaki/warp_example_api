@@ -33,8 +33,8 @@ impl Store {
         limit: Option<u32>,
         offset: u32,
     ) -> Result<Vec<Question>, Error> {
-        match sqlx::query("SELECT * FROM questions LIMIT $1 OFFSET $2")
-            .bind(limit.unwrap_or_default() as i32)
+        match sqlx::query("SELECT * FROM questions LIMIT $1 OFFSET $2;")
+            .bind(limit.map(|i| i as i32))
             .bind(offset as i32)
             .map(|row: PgRow| Question {
                 id: QuestionId(row.get("id")),
@@ -60,7 +60,7 @@ impl Store {
                 id: QuestionId(row.get("id")),
                 title: row.get("title"),
                 content: row.get("content"),
-                tags: row.get("rows"),
+                tags: row.get("tags"),
             })
             .fetch_one(&self.conn)
             .await
@@ -82,7 +82,7 @@ impl Store {
                 id: QuestionId(row.get("id")),
                 title: row.get("title"),
                 content: row.get("content"),
-                tags: row.get("rows")
+                tags: row.get("tags")
             })
             .fetch_one(&self.conn)
             .await {
@@ -104,7 +104,7 @@ impl Store {
                 id: QuestionId(row.get("id")),
                 title: row.get("title"),
                 content: row.get("content"),
-                tags: row.get("rows")
+                tags: row.get("tags")
             })
             .fetch_one(&self.conn)
             .await {
