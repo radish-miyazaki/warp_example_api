@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use tracing::{event, instrument, Level};
 use warp::http::StatusCode;
 
+use crate::profanity::check_profanity;
 use crate::store::Store;
 use crate::types::pagination::{extract_pagination, Pagination};
 use crate::types::question::{NewQuestion, Question};
@@ -45,12 +46,26 @@ pub async fn add_question(
     new_question: NewQuestion,
     store: Store,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    let res: Question = match store.add_question(new_question).await {
+    let title = match check_profanity(new_question.title).await {
         Ok(res) => res,
         Err(e) => return Err(warp::reject::custom(e)),
     };
 
-    Ok(warp::reply::json(&res))
+    let content = match check_profanity(new_question.content).await {
+        Ok(res) => res,
+        Err(e) => return Err(warp::reject::custom(e)),
+    };
+
+    let question = NewQuestion {
+        title,
+        content,
+        tags: new_question.tags,
+    };
+
+    match store.add_question(question).await {
+        Ok(res) => Ok(warp::reply::json(&res)),
+        Err(e) => Err(warp::reject::custom(e)),
+    }
 }
 
 #[instrument]
