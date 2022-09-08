@@ -1,15 +1,20 @@
 #![warn(clippy::all)]
+use dotenv::dotenv;
 use handle_errors::return_error;
 use tracing_subscriber::fmt::format::FmtSpan;
 use warp::hyper::Method;
 use warp::Filter;
 
+mod profanity;
 mod routes;
 mod store;
 mod types;
 
 #[tokio::main]
 async fn main() {
+    // .envファイル読み込み
+    dotenv().ok();
+
     // Database
     let store = store::Store::new("postgres://localhost:5432/rustwebdev").await;
 
@@ -29,8 +34,11 @@ async fn main() {
         .allow_methods(&[Method::PUT, Method::DELETE, Method::GET, Method::POST]);
 
     // Logging & Tracing
+    // INFO: ログレベルを各モジュールごとにセット
+    // 当アプリケーション(question_and_answer) / warp内部 / 自作モジュール(handler_errors)内部
     let log_filter = std::env::var("RUST_LOG")
-        .unwrap_or_else(|_| "question_and_answer=info,warp=error".to_owned()); // ログレベルの追加
+        .unwrap_or_else(|_| "handle_errors=warn,question_and_answer=warn,warp=warn".to_owned());
+    // INFO: ログやトレースをどう扱うを決めるサブスクライバーを定義
     tracing_subscriber::fmt()
         .with_env_filter(log_filter)
         .with_span_events(FmtSpan::CLOSE)
