@@ -74,12 +74,28 @@ pub async fn update_question(
     question: Question,
     store: Store,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    let res = match store.update_question(question, id).await {
-        Ok(res) => res,
-        Err(e) => return Err(warp::reject::custom(e)),
-    };
+    let title = check_profanity(question.title);
+    let content = check_profanity(question.content);
 
-    Ok(warp::reply::json(&res))
+    let (title, content) = tokio::join!(title, content);
+
+    if title.is_ok() && content.is_ok() {
+        let question = Question {
+            id: question.id,
+            title: title.unwrap(),
+            content: content.unwrap(),
+            tags: question.tags,
+        };
+
+        match store.update_question(question, id).await {
+            Ok(res) => Ok(warp::reply::json(&res)),
+            Err(e) => Err(warp::reject::custom(e)),
+        }
+    } else {
+        Err(warp::reject::custom(
+            title.expect_err("Expected API call to have failed here"),
+        ))
+    }
 }
 
 #[instrument]
