@@ -1,5 +1,5 @@
 use argon2::Config;
-use paseto::v2::local_paseto;
+use chrono::prelude::*;
 use rand::Rng;
 use std::env;
 use warp::http::StatusCode;
@@ -55,8 +55,18 @@ fn verify_password(hash: &str, password: &[u8]) -> Result<bool, argon2::Error> {
 }
 
 fn issue_token(account_id: AccountId) -> String {
-    let state = serde_json::to_string(&account_id).expect("Failed to serialize");
+    // 有効期限を1日にセット
+    let current_date_time = Utc::now();
+    let dt = current_date_time + chrono::Duration::days(1);
+
+    // トークン生成時の秘密鍵を.envから取得
     let secret_key = env::var("TOKEN_SECRET_KEY").expect("TOKEN_SECRET_KEY must be set in .env");
 
-    local_paseto(&state, None, secret_key.as_bytes()).expect("Failed to create token")
+    paseto::tokens::PasetoBuilder::new()
+        .set_encryption_key(&Vec::from(secret_key))
+        .set_expiration(&dt)
+        .set_not_before(&Utc::now())
+        .set_claim("account_id", serde_json::json!(account_id))
+        .build()
+        .expect("Failed to construct paseto token w/ builder!")
 }
