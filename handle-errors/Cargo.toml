@@ -11,3 +11,4 @@ sqlx = "0.6"
 tracing = { version = "0.1", features=["log"]}
 reqwest = "0.11"
 reqwest-middleware = "0.1"
+rust-argon2 = "1.0"

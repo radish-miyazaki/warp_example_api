@@ -1,3 +1,4 @@
+use argon2::Error as ArgonError;
 use reqwest::Error as ReqwestError;
 use reqwest_middleware::Error as MiddlewareReqwestError;
 use tracing::{event, instrument, Level};
@@ -26,6 +27,8 @@ pub enum Error {
     ServerError(APILayerError),
     RequestAPIError(ReqwestError),
     MiddlewareReqwestAPIError(MiddlewareReqwestError),
+    WrongPassword,
+    ArgonLibraryError(ArgonError),
 }
 
 impl std::fmt::Display for Error {
@@ -38,6 +41,8 @@ impl std::fmt::Display for Error {
             Error::ServerError(err) => write!(f, "External Server error: {}", err),
             Error::RequestAPIError(err) => write!(f, "External API error: {}", err),
             Error::MiddlewareReqwestAPIError(err) => write!(f, "External API error: {}", err),
+            Error::WrongPassword => write!(f, "Wrong password"),
+            Error::ArgonLibraryError(_) => write!(f, "Cannot verify password"),
         }
     }
 }
@@ -70,6 +75,12 @@ pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
                 StatusCode::UNPROCESSABLE_ENTITY,
             )),
         }
+    } else if let Some(crate::Error::WrongPassword) = r.find() {
+        event!(Level::ERROR, "Entered wrong password");
+        Ok(warp::reply::with_status(
+            "Wrong E-Mail/Password combination".to_string(),
+            StatusCode::UNAUTHORIZED,
+        ))
     } else if let Some(crate::Error::ClientError(e)) = r.find() {
         event!(Level::ERROR, "{}", e);
         Ok(warp::reply::with_status(
