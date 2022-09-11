@@ -1,4 +1,5 @@
 use reqwest::Error as ReqwestError;
+use reqwest_middleware::Error as MiddlewareReqwestError;
 use tracing::{event, instrument, Level};
 use warp::body::BodyDeserializeError;
 use warp::cors::CorsForbidden;
@@ -21,9 +22,10 @@ pub enum Error {
     ParseError(std::num::ParseIntError),
     MissingParameters,
     DatabaseQueryError,
-    ExternalAPIError(ReqwestError),
     ClientError(APILayerError),
     ServerError(APILayerError),
+    RequestAPIError(ReqwestError),
+    MiddlewareReqwestAPIError(MiddlewareReqwestError),
 }
 
 impl std::fmt::Display for Error {
@@ -32,9 +34,10 @@ impl std::fmt::Display for Error {
             Error::ParseError(ref err) => write!(f, "Cannot parse parameter: {}", err),
             Error::MissingParameters => write!(f, "Missing parameter"),
             Error::DatabaseQueryError => write!(f, "Query could not be executed"),
-            Error::ExternalAPIError(err) => write!(f, "Cannot execute {}", err),
             Error::ClientError(err) => write!(f, "External Client error: {}", err),
             Error::ServerError(err) => write!(f, "External Server error: {}", err),
+            Error::RequestAPIError(err) => write!(f, "External API error: {}", err),
+            Error::MiddlewareReqwestAPIError(err) => write!(f, "External API error: {}", err),
         }
     }
 }
@@ -62,7 +65,13 @@ pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
             "Internal Server Error".to_string(),
             StatusCode::INTERNAL_SERVER_ERROR,
         ))
-    } else if let Some(crate::Error::ExternalAPIError(e)) = r.find() {
+    } else if let Some(crate::Error::RequestAPIError(e)) = r.find() {
+        event!(Level::ERROR, "{}", e);
+        Ok(warp::reply::with_status(
+            "Internal Server Error".to_string(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        ))
+    } else if let Some(crate::Error::MiddlewareReqwestAPIError(e)) = r.find() {
         event!(Level::ERROR, "{}", e);
         Ok(warp::reply::with_status(
             "Internal Server Error".to_string(),
