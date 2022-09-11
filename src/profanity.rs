@@ -1,3 +1,5 @@
+use reqwest_middleware::ClientBuilder;
+use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use serde::{Deserialize, Serialize};
 use std::env;
 
@@ -26,7 +28,13 @@ struct BadWordsResponse {
 
 /// 渡された文字列に不適切な単語が含まれていないかチェックし、含まれている場合は単語をフィルタリングして返す
 pub async fn check_profanity(content: String) -> Result<String, handle_errors::Error> {
-    let client = reqwest::Client::new();
+    // リトライを3回する設定を追加
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
+    // 上記の設定を含めたMiddlewareをHTTP Clientに適用
+    let client = ClientBuilder::new(reqwest::Client::new())
+        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+        .build();
+
     let res = client
         .post(env::var("BAD_WORDS_API_URL").expect("BAD_WORDS_API_URL must be set in .env"))
         .header(
@@ -36,7 +44,7 @@ pub async fn check_profanity(content: String) -> Result<String, handle_errors::E
         .body(content)
         .send()
         .await
-        .map_err(handle_errors::Error::ExternalAPIError)?;
+        .map_err(|e| handle_errors::Error::MiddlewareReqwestAPIError(e))?;
 
     // API失敗時の処理
     if !res.status().is_success() {
@@ -54,6 +62,6 @@ pub async fn check_profanity(content: String) -> Result<String, handle_errors::E
 
     match res.json::<BadWordsResponse>().await {
         Ok(res) => Ok(res.censored_content),
-        Err(e) => Err(handle_errors::Error::ExternalAPIError(e)),
+        Err(e) => Err(handle_errors::Error::RequestAPIError(e)),
     }
 }
