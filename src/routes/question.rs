@@ -77,13 +77,13 @@ pub async fn update_question(
     let title = check_profanity(question.title);
     let content = check_profanity(question.content);
 
-    let (title, content) = tokio::join!(title, content);
+    let res = tokio::join!(title, content);
 
-    if title.is_ok() && content.is_ok() {
+    if let (Ok(title), Ok(content)) = res {
         let question = Question {
             id: question.id,
-            title: title.unwrap(),
-            content: content.unwrap(),
+            title,
+            content,
             tags: question.tags,
         };
 
@@ -93,7 +93,7 @@ pub async fn update_question(
         }
     } else {
         Err(warp::reject::custom(
-            title.expect_err("Expected API call to have failed here"),
+            res.0.expect_err("Expected API call to have failed here"),
         ))
     }
 }
