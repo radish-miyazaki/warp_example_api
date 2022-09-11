@@ -19,7 +19,8 @@ async fn main() {
     let store = store::Store::new("postgres://localhost:5432/rustwebdev").await;
 
     // Migration
-    sqlx::migrate!()
+    // INFO: ディレクトリを指定しないと、ALTER TABLEが効かなかったので追加
+    sqlx::migrate!("./migrations")
         .run(&store.clone().conn)
         .await
         .expect("Cannnot run migration");
