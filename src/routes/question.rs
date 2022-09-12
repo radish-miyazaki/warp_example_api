@@ -4,6 +4,7 @@ use warp::http::StatusCode;
 
 use crate::profanity::check_profanity;
 use crate::store::Store;
+use crate::types::account::Session;
 use crate::types::pagination::{extract_pagination, Pagination};
 use crate::types::question::{NewQuestion, Question};
 
@@ -45,7 +46,10 @@ pub async fn get_question(id: i32, store: Store) -> Result<impl warp::Reply, war
 pub async fn add_question(
     new_question: NewQuestion,
     store: Store,
+    session: Session,
 ) -> Result<impl warp::Reply, warp::Rejection> {
+    let account_id = session.account_id;
+
     let title = match check_profanity(new_question.title).await {
         Ok(res) => res,
         Err(e) => return Err(warp::reject::custom(e)),
@@ -62,7 +66,7 @@ pub async fn add_question(
         tags: new_question.tags,
     };
 
-    match store.add_question(question).await {
+    match store.add_question(question, account_id).await {
         Ok(res) => Ok(warp::reply::json(&res)),
         Err(e) => Err(warp::reject::custom(e)),
     }
@@ -73,39 +77,54 @@ pub async fn update_question(
     id: i32,
     question: Question,
     store: Store,
+    session: Session,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    let title = check_profanity(question.title);
-    let content = check_profanity(question.content);
+    let account_id = session.account_id;
+    if store.is_question_owner(id, &account_id).await? {
+        let title = check_profanity(question.title);
+        let content = check_profanity(question.content);
 
-    let res = tokio::join!(title, content);
+        let res = tokio::join!(title, content);
 
-    if let (Ok(title), Ok(content)) = res {
-        let question = Question {
-            id: question.id,
-            title,
-            content,
-            tags: question.tags,
-        };
+        if let (Ok(title), Ok(content)) = res {
+            let question = Question {
+                id: question.id,
+                title,
+                content,
+                tags: question.tags,
+            };
 
-        match store.update_question(question, id).await {
-            Ok(res) => Ok(warp::reply::json(&res)),
-            Err(e) => Err(warp::reject::custom(e)),
+            match store.update_question(question, id, account_id).await {
+                Ok(res) => Ok(warp::reply::json(&res)),
+                Err(e) => Err(warp::reject::custom(e)),
+            }
+        } else {
+            Err(warp::reject::custom(
+                res.0.expect_err("Expected API call to have failed here"),
+            ))
         }
     } else {
-        Err(warp::reject::custom(
-            res.0.expect_err("Expected API call to have failed here"),
-        ))
+        Err(warp::reject::custom(handle_errors::Error::Unauthorized))
     }
 }
 
 #[instrument]
-pub async fn delete_question(id: i32, store: Store) -> Result<impl warp::Reply, warp::Rejection> {
-    if let Err(e) = store.delete_question(id).await {
-        return Err(warp::reject::custom(e));
-    }
+pub async fn delete_question(
+    id: i32,
+    store: Store,
+    session: Session,
+) -> Result<impl warp::Reply, warp::Rejection> {
+    let account_id = session.account_id;
+    if store.is_question_owner(id, &account_id).await? {
+        if let Err(e) = store.delete_question(id, account_id).await {
+            return Err(warp::reject::custom(e));
+        }
 
-    Ok(warp::reply::with_status(
-        format!("Question {} deleted", id),
-        StatusCode::OK,
-    ))
+        Ok(warp::reply::with_status(
+            format!("Question {} deleted", id),
+            StatusCode::OK,
+        ))
+    } else {
+        Err(warp::reject::custom(handle_errors::Error::Unauthorized))
+    }
 }
