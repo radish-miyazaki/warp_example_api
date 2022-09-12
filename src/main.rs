@@ -160,5 +160,9 @@ async fn main() {
         .with(warp::trace::request())
         .recover(return_error);
 
+    tracing::info!(
+        "Q&A service build ID {}",
+        env!("QUESTION_AND_ANSWER_VERSION")
+    );
     warp::serve(routes).run(([127, 0, 0, 1], config.port)).await;
 }
