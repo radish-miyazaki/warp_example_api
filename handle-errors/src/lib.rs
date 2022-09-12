@@ -29,6 +29,8 @@ pub enum Error {
     MiddlewareReqwestAPIError(MiddlewareReqwestError),
     WrongPassword,
     ArgonLibraryError(ArgonError),
+    Unauthorized,
+    CannotDecryptToken,
 }
 
 impl std::fmt::Display for Error {
@@ -43,12 +45,17 @@ impl std::fmt::Display for Error {
             Error::MiddlewareReqwestAPIError(err) => write!(f, "External API error: {}", err),
             Error::WrongPassword => write!(f, "Wrong password"),
             Error::ArgonLibraryError(_) => write!(f, "Cannot verify password"),
+            Error::Unauthorized => write!(f, "No permission to change the underlying resource"),
+            Error::CannotDecryptToken => write!(f, "Cannot decrypt error"),
         }
     }
 }
 
 // INFO: warpでカスタムエラーを返せるように、Rejectマーカートレイトを実装
 impl Reject for Error {}
+impl Reject for APILayerError {}
+
+const DUPLICATE_KEY: u32 = 23505;
 
 #[instrument]
 pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
@@ -57,7 +64,7 @@ pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
 
         match e {
             sqlx::Error::Database(err) => {
-                if err.code().unwrap().parse::<i32>().unwrap() == 23505 {
+                if err.code().unwrap().parse::<u32>().unwrap() == DUPLICATE_KEY {
                     Ok(warp::reply::with_status(
                         "Account already exists".to_string(),
                         StatusCode::UNPROCESSABLE_ENTITY,
@@ -75,6 +82,12 @@ pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
                 StatusCode::UNPROCESSABLE_ENTITY,
             )),
         }
+    } else if let Some(crate::Error::Unauthorized) = r.find() {
+        event!(Level::ERROR, "Not matching account id");
+        Ok(warp::reply::with_status(
+            "No pertmission to change underlying resource".to_string(),
+            StatusCode::UNAUTHORIZED,
+        ))
     } else if let Some(crate::Error::WrongPassword) = r.find() {
         event!(Level::ERROR, "Entered wrong password");
         Ok(warp::reply::with_status(
