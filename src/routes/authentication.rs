@@ -3,9 +3,10 @@ use chrono::prelude::*;
 use rand::Rng;
 use std::env;
 use warp::http::StatusCode;
+use warp::Filter;
 
 use crate::store::Store;
-use crate::types::account::{Account, AccountId};
+use crate::types::account::{Account, AccountId, Session};
 
 pub async fn register(store: Store, account: Account) -> Result<impl warp::Reply, warp::Rejection> {
     let hashed_password = hash(account.password.as_bytes());
@@ -42,6 +43,33 @@ pub async fn login(store: Store, login: Account) -> Result<impl warp::Reply, war
         },
         Err(e) => Err(warp::reject::custom(e)),
     }
+}
+
+pub fn verify_token(token: String) -> Result<Session, handle_errors::Error> {
+    let secret_key = env::var("TOKEN_SECRET_KEY").expect("TOKEN_SECRET_KEY must be set in .env");
+    let token = paseto::tokens::validate_local_token(
+        &token,
+        None,
+        &Vec::from(secret_key),
+        &paseto::tokens::TimeBackend::Chrono,
+    )
+    .map_err(|_| handle_errors::Error::CannotDecryptToken)?;
+
+    serde_json::from_value::<Session>(token).map_err(|_| handle_errors::Error::CannotDecryptToken)
+}
+
+/// 戻り値の型はwarp::Filter::andメソッドに併せてセット
+pub fn auth() -> impl Filter<Extract = (Session,), Error = warp::Rejection> + Clone {
+    // warp::Filter::and_thenメソッドにセットする関数は非同期である必要があるのでasyncを付与
+    // @ref https://docs.rs/warp/0.3.1/warp/trait.Filter.html#method.and_then
+    warp::header::<String>("Authorization").and_then(|token: String| async move {
+        let token = match verify_token(token) {
+            Ok(t) => t,
+            Err(_) => return Err(warp::reject::reject()),
+        };
+
+        Ok(token)
+    })
 }
 
 pub fn hash(password: &[u8]) -> String {
