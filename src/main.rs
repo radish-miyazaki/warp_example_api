@@ -1,4 +1,5 @@
 #![warn(clippy::all)]
+use config::Config;
 use dotenv::dotenv;
 use handle_errors::return_error;
 use tracing_subscriber::fmt::format::FmtSpan;
@@ -10,13 +11,33 @@ mod routes;
 mod store;
 mod types;
 
+#[derive(Debug, Default, serde::Deserialize, PartialEq)]
+struct Args {
+    log_level: String,
+    database_host: String,
+    database_port: u16,
+    database_name: String,
+    port: u16,
+}
+
 #[tokio::main]
 async fn main() {
     // .envファイル読み込み
     dotenv().ok();
 
+    let config = Config::builder()
+        .add_source(config::File::with_name("setup"))
+        .build()
+        .unwrap();
+
+    let config = config.try_deserialize::<Args>().unwrap();
+
     // Database
-    let store = store::Store::new("postgres://localhost:5432/rustwebdev").await;
+    let store = store::Store::new(&format!(
+        "postgres://{}:{}/{}",
+        config.database_host, config.database_port, config.database_name
+    ))
+    .await;
 
     // Migration
     // INFO: ディレクトリを指定しないと、ALTER TABLEが効かなかったので追加
@@ -37,8 +58,12 @@ async fn main() {
     // Logging & Tracing
     // INFO: ログレベルを各モジュールごとにセット
     // 当アプリケーション(question_and_answer) / warp内部 / 自作モジュール(handler_errors)内部
-    let log_filter = std::env::var("RUST_LOG")
-        .unwrap_or_else(|_| "handle_errors=warn,question_and_answer=warn,warp=warn".to_owned());
+    let log_filter = std::env::var("RUST_LOG").unwrap_or_else(|_| {
+        format!(
+            "handle_errors={},question_and_answer={},warp={}",
+            config.log_level, config.log_level, config.log_level
+        )
+    });
     // INFO: ログやトレースをどう扱うを決めるサブスクライバーを定義
     tracing_subscriber::fmt()
         .with_env_filter(log_filter)
@@ -135,5 +160,5 @@ async fn main() {
         .with(warp::trace::request())
         .recover(return_error);
 
-    warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
+    warp::serve(routes).run(([127, 0, 0, 1], config.port)).await;
 }
