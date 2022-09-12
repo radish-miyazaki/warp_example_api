@@ -49,8 +49,8 @@ async fn main() {
     let get_questions = warp::get()
         .and(warp::path("questions"))
         .and(warp::path::end())
-        .and(warp::query()) // ハンドラの第1引数にクエリパラメータ
-        .and(store_filter.clone()) // 第2引数にStore 第3引数にエラー用のUUID
+        .and(warp::query())
+        .and(store_filter.clone())
         .and_then(routes::question::get_questions)
         .with(warp::trace(|info| {
             tracing::info_span!(
@@ -73,8 +73,9 @@ async fn main() {
     let add_question = warp::post()
         .and(warp::path("questions"))
         .and(warp::path::end())
-        .and(warp::body::json()) // 第1引数にハンドラの引数にリクエストボディ
-        .and(store_filter.clone()) // 第2引数にStore
+        .and(warp::body::json())
+        .and(store_filter.clone())
+        .and(routes::authentication::auth())
         .and_then(routes::question::add_question);
 
     // PUT /questions/:question_id
@@ -84,6 +85,7 @@ async fn main() {
         .and(warp::path::end())
         .and(warp::body::json())
         .and(store_filter.clone())
+        .and(routes::authentication::auth())
         .and_then(routes::question::update_question);
 
     // DELETE /questions/:question_id
@@ -92,6 +94,7 @@ async fn main() {
         .and(warp::path::param::<i32>())
         .and(warp::path::end())
         .and(store_filter.clone())
+        .and(routes::authentication::auth())
         .and_then(routes::question::delete_question);
 
     // POST /answers (x-www-form-urlencoded)
@@ -101,9 +104,10 @@ async fn main() {
         .and(warp::path::end())
         .and(store_filter.clone())
         .and(warp::body::form())
+        .and(routes::authentication::auth())
         .and_then(routes::answer::add_answer);
 
-    // POST /register
+    // POST /registration
     let registration = warp::post()
         .and(warp::path("registration"))
         .and(warp::path::end())
