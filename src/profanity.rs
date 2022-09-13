@@ -36,11 +36,8 @@ pub async fn check_profanity(content: String) -> Result<String, handle_errors::E
         .build();
 
     let res = client
-        .post(env::var("BAD_WORDS_API_URL").expect("BAD_WORDS_API_URL must be set in .env"))
-        .header(
-            "apikey",
-            env::var("BAD_WORDS_API_KEY").expect("BAD_WORDS_API_KEY must be set in .env"),
-        )
+        .post(env::var("BAD_WORDS_API_URL").unwrap())
+        .header("apikey", env::var("BAD_WORDS_API_KEY").unwrap())
         .body(content)
         .send()
         .await

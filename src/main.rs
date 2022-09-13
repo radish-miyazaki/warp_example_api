@@ -1,41 +1,28 @@
 #![warn(clippy::all)]
-use config::Config;
-use dotenv::dotenv;
 use handle_errors::return_error;
+use std::env;
 use tracing_subscriber::fmt::format::FmtSpan;
 use warp::hyper::Method;
 use warp::Filter;
 
+mod config;
 mod profanity;
 mod routes;
 mod store;
 mod types;
 
-#[derive(Debug, Default, serde::Deserialize, PartialEq)]
-struct Args {
-    log_level: String,
-    database_host: String,
-    database_port: u16,
-    database_name: String,
-    port: u16,
-}
-
 #[tokio::main]
 async fn main() {
-    // .envファイル読み込み
-    dotenv().ok();
-
-    let config = Config::builder()
-        .add_source(config::File::with_name("setup"))
-        .build()
-        .unwrap();
-
-    let config = config.try_deserialize::<Args>().unwrap();
+    let config = config::Config::new().expect("Config can't be set");
 
     // Database
     let store = store::Store::new(&format!(
-        "postgres://{}:{}/{}",
-        config.database_host, config.database_port, config.database_name
+        "postgres://{}:{}@{}:{}/{}",
+        config.database_user,
+        config.database_password,
+        config.database_host,
+        config.database_port,
+        config.database_name
     ))
     .await;
 

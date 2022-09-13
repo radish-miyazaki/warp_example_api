@@ -46,7 +46,7 @@ pub async fn login(store: Store, login: Account) -> Result<impl warp::Reply, war
 }
 
 pub fn verify_token(token: String) -> Result<Session, handle_errors::Error> {
-    let secret_key = env::var("TOKEN_SECRET_KEY").expect("TOKEN_SECRET_KEY must be set in .env");
+    let secret_key = env::var("TOKEN_SECRET_KEY").unwrap();
     let token = paseto::tokens::validate_local_token(
         &token,
         None,
@@ -88,7 +88,7 @@ fn issue_token(account_id: AccountId) -> String {
     let dt = current_date_time + chrono::Duration::days(1);
 
     // トークン生成時の秘密鍵を.envから取得
-    let secret_key = env::var("TOKEN_SECRET_KEY").expect("TOKEN_SECRET_KEY must be set in .env");
+    let secret_key = env::var("TOKEN_SECRET_KEY").unwrap();
 
     paseto::tokens::PasetoBuilder::new()
         .set_encryption_key(&Vec::from(secret_key))
