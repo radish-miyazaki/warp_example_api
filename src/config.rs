@@ -12,11 +12,11 @@ pub struct Config {
     pub database_port: u16,
     #[clap(long, default_value = "rustwebdev")]
     pub database_name: String,
-    #[clap(long, default_value = "")]
+    #[clap(long, default_value = "user")]
     pub database_user: String,
     #[clap(short, long, default_value = "8080")]
     pub port: u16,
-    #[clap(long, default_value = "")]
+    #[clap(long, default_value = "password")]
     pub database_password: String,
 }
 
