@@ -14,6 +14,8 @@ mod types;
 #[tokio::main]
 async fn main() {
     let config = config::Config::new().expect("Config can't be set");
+    // .envファイル読み込み
+    dotenv::dotenv().ok();
 
     // Database
     let store = store::Store::new(&format!(

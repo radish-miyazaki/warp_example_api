@@ -1,7 +1,7 @@
 use clap::Parser;
 use std::env;
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Parser, PartialEq)]
 #[clap(author, version, about, long_about = None)]
 pub struct Config {
     #[clap(short, long, default_value = "warn")]
@@ -22,9 +22,6 @@ pub struct Config {
 
 impl Config {
     pub fn new() -> Result<Config, handle_errors::Error> {
-        // .envファイル読み込み
-        dotenv::dotenv().ok();
-
         let config = Config::parse();
 
         if env::var("BAD_WORDS_API_URL").is_err() {
@@ -66,5 +63,43 @@ impl Config {
                 .map_err(handle_errors::Error::ParseError)?,
             database_name,
         })
+    }
+}
+
+#[cfg(test)]
+mod config_tests {
+    use super::*;
+
+    fn set_env() {
+        env::set_var("BAD_WORDS_API_URL", "http://localhost:3030");
+        env::set_var("BAD_WORDS_API_KEY", "yes");
+        env::set_var("TOKEN_SECRET_KEY", "yes");
+        env::set_var("POSTGRES_USER", "user");
+        env::set_var("POSTGRES_PASSWORD", "pass");
+        env::set_var("POSTGRES_HOST", "localhost");
+        env::set_var("POSTGRES_PORT", "5432");
+        env::set_var("POSTGRES_DB", "rustwebdev");
+    }
+
+    #[test]
+    fn unset_and_set_api_key() {
+        let result = std::panic::catch_unwind(Config::new);
+        assert!(result.is_err());
+
+        set_env();
+
+        let expected = Config {
+            log_level: "warn".to_string(),
+            port: 8080,
+            database_user: "user".to_string(),
+            database_password: "pass".to_string(),
+            database_host: "localhost".to_string(),
+            database_port: 5432,
+            database_name: "rustwebdev".to_string(),
+        };
+
+        let config = Config::new().unwrap();
+
+        assert_eq!(expected, config);
     }
 }
