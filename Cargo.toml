@@ -26,6 +26,7 @@ rust-argon2 = "1.0"
 paseto = "2.0"
 chrono = "0.4"
 clap = { version = "3.2", features = ["derive"]}
+openssl = { version = "0.10", features = ["vendored"] }
 
 [build-dependencies]
 platforms = "2.0.0"
