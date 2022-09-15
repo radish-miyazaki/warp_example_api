@@ -98,3 +98,22 @@ fn issue_token(account_id: AccountId) -> String {
         .build()
         .expect("Failed to construct paseto token w/ builder!")
 }
+
+#[cfg(test)]
+mod authentication_tests {
+    use super::{auth, env, issue_token, AccountId};
+
+    #[tokio::test]
+    async fn post_questions_auth() {
+        env::set_var("TOKEN_SECRET_KEY", "7ZcbZPVuSTL4UasiGi3iwrZzWhKZadBY");
+        let token = issue_token(AccountId(3));
+
+        let filter = auth();
+
+        let res = warp::test::request()
+            .header("Authorization", token)
+            .filter(&filter);
+
+        assert_eq!(res.await.unwrap().account_id, AccountId(3));
+    }
+}

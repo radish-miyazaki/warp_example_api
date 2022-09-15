@@ -73,7 +73,7 @@ mod config_tests {
     fn set_env() {
         env::set_var("BAD_WORDS_API_URL", "http://localhost:3030");
         env::set_var("BAD_WORDS_API_KEY", "yes");
-        env::set_var("TOKEN_SECRET_KEY", "yes");
+        env::set_var("TOKEN_SECRET_KEY", "7ZcbZPVuSTL4UasiGi3iwrZzWhKZadBY");
         env::set_var("POSTGRES_USER", "user");
         env::set_var("POSTGRES_PASSWORD", "pass");
         env::set_var("POSTGRES_HOST", "localhost");
