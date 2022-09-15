@@ -1,40 +1,16 @@
 #![warn(clippy::all)]
 use handle_errors::return_error;
-use std::env;
 use tracing_subscriber::fmt::format::FmtSpan;
 use warp::hyper::Method;
 use warp::Filter;
 
-mod config;
+pub mod config;
 mod profanity;
 mod routes;
 mod store;
 mod types;
 
-#[tokio::main]
-async fn main() {
-    let config = config::Config::new().expect("Config can't be set");
-    // .envファイル読み込み
-    dotenv::dotenv().ok();
-
-    // Database
-    let store = store::Store::new(&format!(
-        "postgres://{}:{}@{}:{}/{}",
-        config.database_user,
-        config.database_password,
-        config.database_host,
-        config.database_port,
-        config.database_name
-    ))
-    .await;
-
-    // Migration
-    // INFO: ディレクトリを指定しないと、ALTER TABLEが効かなかったので追加
-    sqlx::migrate!("./migrations")
-        .run(&store.clone().conn)
-        .await
-        .expect("Cannnot run migration");
-
+async fn build_routes(store: store::Store) -> impl Filter<Extract = impl warp::Reply> + Clone {
     // INFO: storeをmapのコールバック内に所有権を移動しているので、各storeの操作が終わった後にfilter化
     let store_filter = warp::any().map(move || store.clone());
 
@@ -43,21 +19,6 @@ async fn main() {
         .allow_any_origin()
         .allow_header("content-type")
         .allow_methods(&[Method::PUT, Method::DELETE, Method::GET, Method::POST]);
-
-    // Logging & Tracing
-    // INFO: ログレベルを各モジュールごとにセット
-    // 当アプリケーション(question_and_answer) / warp内部 / 自作モジュール(handler_errors)内部
-    let log_filter = std::env::var("RUST_LOG").unwrap_or_else(|_| {
-        format!(
-            "handle_errors={},question_and_answer={},warp={}",
-            config.log_level, config.log_level, config.log_level
-        )
-    });
-    // INFO: ログやトレースをどう扱うを決めるサブスクライバーを定義
-    tracing_subscriber::fmt()
-        .with_env_filter(log_filter)
-        .with_span_events(FmtSpan::CLOSE)
-        .init(); // tracing-subscriberのセット
 
     // GET /questions
     let get_questions = warp::get()
@@ -133,11 +94,11 @@ async fn main() {
     let login = warp::post()
         .and(warp::path("login"))
         .and(warp::path::end())
-        .and(store_filter.clone())
+        .and(store_filter)
         .and(warp::body::json())
         .and_then(routes::authentication::login);
 
-    let routes = get_questions
+    get_questions
         .or(get_question)
         .or(add_question)
         .or(update_question)
@@ -147,11 +108,48 @@ async fn main() {
         .or(login)
         .with(cors)
         .with(warp::trace::request())
-        .recover(return_error);
+        .recover(return_error)
+}
 
-    tracing::info!(
-        "Q&A service build ID {}",
-        env!("QUESTION_AND_ANSWER_VERSION")
-    );
-    warp::serve(routes).run(([127, 0, 0, 1], config.port)).await;
+pub async fn setup_store(config: &config::Config) -> Result<store::Store, handle_errors::Error> {
+    // Database
+    let store = store::Store::new(&format!(
+        "postgres://{}:{}@{}:{}/{}",
+        config.database_user,
+        config.database_password,
+        config.database_host,
+        config.database_port,
+        config.database_name
+    ))
+    .await;
+
+    // Migration
+    // INFO: ディレクトリを指定しないと、ALTER TABLEが効かなかったので追加
+    sqlx::migrate!("./migrations")
+        .run(&store.clone().conn)
+        .await
+        .expect("Cannnot run migration");
+
+    // Logging & Tracing
+    // INFO: ログレベルを各モジュールごとにセット
+    // 当アプリケーション(question_and_answer) / warp内部 / 自作モジュール(handler_errors)内部
+    let log_filter = std::env::var("RUST_LOG").unwrap_or_else(|_| {
+        format!(
+            "handle_errors={},question_and_answer={},warp={}",
+            config.log_level, config.log_level, config.log_level
+        )
+    });
+
+    // INFO: ログやトレースをどう扱うを決めるサブスクライバーを定義
+    tracing_subscriber::fmt()
+        .with_env_filter(log_filter)
+        .with_span_events(FmtSpan::CLOSE)
+        .init(); // tracing-subscriberのセット
+
+    Ok(store)
+}
+
+pub async fn run(config: config::Config, store: store::Store) {
+    let routes = build_routes(store).await;
+    warp::serve(routes).run(([0, 0, 0, 0], config.port)).await;
 }
