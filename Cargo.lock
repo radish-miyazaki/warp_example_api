@@ -1023,6 +1023,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "mock-server"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "serde_json",
+ "tokio",
+ "warp",
+]
+
+[[package]]
 name = "multipart"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1358,6 +1368,7 @@ dependencies = [
  "clap",
  "dotenv",
  "handle-errors",
+ "mock-server",
  "openssl",
  "parking_lot 0.12.1",
  "paseto",
